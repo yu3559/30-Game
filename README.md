@@ -9,6 +9,8 @@
 ## 遊び方
 
 ```
+git clone https://github.com/yu3559/30-Game.git
+cd 30-Game
 npm install
 npm run dev
 ```
