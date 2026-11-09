@@ -18,8 +18,7 @@ export function RulesDialog({ onClose }) {
         aria-labelledby="rules-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <p className="eyebrow">ルール</p>
-        <h2 id="rules-title">30を言ったら負け</h2>
+        <h2 id="rules-title">ルール</h2>
         <div className="rules">
           <section>
             <h3>勝ち負け</h3>
@@ -27,24 +26,15 @@ export function RulesDialog({ onClose }) {
           </section>
           <section>
             <h3>能力</h3>
-            <p>2人とも LOCK、BREAK、BLIND を1回ずつ持っています。1ターンに使えるのは1つまでで、使ったかどうかは相手にも分かります。</p>
+            <p>2人とも LOCK、BOOST、BLIND を1回ずつ持っています。1ターンに使えるのは1つまでで、使ったかどうかは相手にも分かります。</p>
             <ul>
-              <li><b>LOCK</b>数字を進めた直後に発動します。相手の次の手は +1 だけになります。</li>
-              <li><b>BREAK</b>自分の手を +4 にできます。+1〜+3 の代わりに使います。</li>
-              <li><b>BLIND</b>数字を進めた直後に発動します。相手の次の1ターンだけ、今の数字と履歴が隠されます。</li>
+              <li><b>LOCK</b> 数字を進めるときに一緒に使います。相手の次の手は +1 だけになります。</li>
+              <li><b>BOOST</b> 自分の手を +4 にします。+1〜+3 の代わりに使います。</li>
+              <li><b>BLIND</b> 数字を進めるときに一緒に使います。相手の次の1ターンだけ、今の数字が隠されます。</li>
             </ul>
           </section>
-          <section>
-            <h3>定石</h3>
-            <p>能力を使わないとき、1、5、9、13、17、21、25、29 を相手の番にすると有利です。LOCK と BREAK で、この並びは崩れます。</p>
-          </section>
-          <section>
-            <h3>対戦</h3>
-            <p>ローカルは1台の端末を交代で使います。BLIND のあいだは、渡す画面にも数字を出しません。</p>
-            <p>オンラインは4文字のルームコードでつなぎます。BLIND 中の数字は、相手の端末にも送りません。再戦するたびに先手を交代します。</p>
-          </section>
         </div>
-        <button type="button" className="primary" onClick={onClose}>閉じる</button>
+        <button type="button" className="filled" onClick={onClose}>閉じる</button>
       </div>
     </div>
   )
@@ -60,38 +50,16 @@ export function Title({ error, canRestore, onLocal, onCreate, onJoin, onRestore,
   return (
     <main className="page">
       <section className="frame home">
-        <p className="eyebrow">2人対戦</p>
-        <h1 className="title-mark">
-          <span className="num">30</span>
-          <span className="rest">を言ったら負け</span>
-        </h1>
-        <p className="lede">必勝手順は、能力ひとつで崩れる。</p>
+        <h1 className="title-mark">30</h1>
 
         {step === 'home' && (
-          <>
-            <ul className="ability-cards">
-              <li>
-                <b>LOCK</b>
-                <span>相手の次の手を +1 に固定</span>
-              </li>
-              <li>
-                <b>BREAK</b>
-                <span>自分の手番に +4 できる</span>
-              </li>
-              <li>
-                <b>BLIND</b>
-                <span>相手から数字と履歴を隠す</span>
-              </li>
-            </ul>
-            <div className="actions">
-              <button type="button" className="primary" onClick={() => setStep('local')}>ローカルで対戦</button>
-              <button type="button" className="ghost" onClick={() => setStep('online')}>オンラインで対戦</button>
-              {canRestore && (
-                <button type="button" className="ghost" onClick={onRestore}>直前の対戦に戻る</button>
-              )}
-              <button type="button" className="texty" onClick={onRules}>ルールを見る</button>
-            </div>
-          </>
+          <div className="actions">
+            <button type="button" className="filled" onClick={() => setStep('local')}>ローカルで対戦</button>
+            <button type="button" onClick={() => setStep('online')}>オンラインで対戦</button>
+            {canRestore && (
+              <button type="button" onClick={onRestore}>直前の対戦に戻る</button>
+            )}
+          </div>
         )}
 
         {step === 'local' && (
@@ -111,8 +79,8 @@ export function Title({ error, canRestore, onLocal, onCreate, onJoin, onRestore,
               <input value={p2} maxLength={12} onChange={(event) => setP2(event.target.value)} />
             </label>
             <div className="actions">
-              <button type="submit" className="primary">対戦を始める</button>
-              <button type="button" className="ghost" onClick={() => setStep('home')}>戻る</button>
+              <button type="submit" className="filled">対戦を始める</button>
+              <button type="button" onClick={() => setStep('home')}>戻る</button>
             </div>
           </form>
         )}
@@ -127,12 +95,11 @@ export function Title({ error, canRestore, onLocal, onCreate, onJoin, onRestore,
             }}
           >
             <label>
-              あなたの名前
+              名前
               <input value={name} maxLength={12} placeholder="名前" onChange={(event) => setName(event.target.value)} />
             </label>
-            <p className="note">ルームを作った人が、最初の先手です。再戦で交代します。</p>
             <div className="actions">
-              <button type="button" className="primary" onClick={() => onCreate(name)}>ルームを作る</button>
+              <button type="button" className="filled" onClick={() => onCreate(name)}>ルームを作る</button>
             </div>
             <div className="code-row">
               <input
@@ -144,7 +111,7 @@ export function Title({ error, canRestore, onLocal, onCreate, onJoin, onRestore,
                 spellCheck={false}
                 onChange={(event) => setRoom(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))}
               />
-              <button type="button" className="ghost" disabled={room.length !== 4} onClick={() => onJoin(name, room)}>
+              <button type="button" disabled={room.length !== 4} onClick={() => onJoin(name, room)}>
                 参加
               </button>
             </div>
@@ -152,7 +119,8 @@ export function Title({ error, canRestore, onLocal, onCreate, onJoin, onRestore,
           </form>
         )}
 
-        {error && <p className="banner warn">{error}</p>}
+        {error && <p className="note">{error}</p>}
+        <button type="button" className="texty" onClick={onRules}>ルール</button>
       </section>
     </main>
   )
@@ -162,9 +130,8 @@ export function Connecting({ onCancel }) {
   return (
     <main className="page">
       <section className="frame center-copy">
-        <p className="eyebrow">オンライン</p>
         <h1>接続しています</h1>
-        <button type="button" className="ghost" onClick={onCancel}>キャンセル</button>
+        <button type="button" onClick={onCancel}>キャンセル</button>
       </section>
     </main>
   )
@@ -185,9 +152,7 @@ export function Lobby({ code, names, onLeave, onRules }) {
   return (
     <main className="page">
       <section className="frame center-copy">
-        <p className="eyebrow">オンライン</p>
         <h1>相手を待っています</h1>
-        <p className="lede">同じページを開いた相手に、コードを伝えてください。</p>
         <input
           className="room-code"
           readOnly
@@ -196,11 +161,11 @@ export function Lobby({ code, names, onLeave, onRules }) {
           onFocus={(event) => event.target.select()}
         />
         <div className="actions">
-          <button type="button" className="primary" onClick={copy}>{copied ? 'コピーしました' : 'コードをコピー'}</button>
-          <button type="button" className="ghost" onClick={onRules}>ルール</button>
-          <button type="button" className="texty" onClick={onLeave}>キャンセル</button>
+          <button type="button" className="filled" onClick={copy}>{copied ? 'コピーしました' : 'コードをコピー'}</button>
+          <button type="button" onClick={onRules}>ルール</button>
+          <button type="button" onClick={onLeave}>キャンセル</button>
         </div>
-        <p className="note">{names?.p1 || 'ホスト'} が待機中です。別の端末なら、このPCに表示されているURLを開いてください。</p>
+        <p className="note">{names?.p1 || 'ホスト'} が待機中です</p>
       </section>
     </main>
   )
@@ -209,19 +174,17 @@ export function Lobby({ code, names, onLeave, onRules }) {
 export function Handoff({ name, number, locked, onReady, onRules }) {
   return (
     <main className="page">
-      <section className="frame center-copy handoff">
-        <p className="eyebrow">交代</p>
+      <section className="frame center-copy">
         <h1>{name}の番</h1>
         {number == null ? (
-          <p className="blind-note">数字と履歴は隠されています。記憶を頼りに選んでください。</p>
+          <p className="note">数字は隠されています</p>
         ) : (
-          <p className="handoff-number" aria-hidden="true">{number}</p>
+          <p className="digit" aria-hidden="true">{number}</p>
         )}
-        {locked && <p className="note">このターンは +1 だけ選べます。</p>}
-        <p className="lede">端末を渡してから、押してください。</p>
+        {locked && <p className="note">+1 だけ</p>}
         <div className="actions">
-          <button type="button" className="primary" onClick={onReady}>準備できた</button>
-          <button type="button" className="texty" onClick={onRules}>ルール</button>
+          <button type="button" className="filled" onClick={onReady}>準備できた</button>
+          <button type="button" onClick={onRules}>ルール</button>
         </div>
       </section>
     </main>

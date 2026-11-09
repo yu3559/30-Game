@@ -69,7 +69,7 @@ export function applyMove(state, seat, delta) {
 
   const constraint = activeConstraint(state)
   if (constraint === 'lock' && delta !== 1) return fail('LOCK中は +1 しか選べません')
-  if (delta === 4 && !state.abilities[seat].break) return fail('BREAK はもう使えません')
+  if (delta === 4 && !state.abilities[seat].break) return fail('BOOST はもう使えません')
 
   const from = state.current
   const to = from + delta

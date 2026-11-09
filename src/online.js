@@ -32,6 +32,7 @@ export function useRoom() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const pendingRef = useRef(false)
+  const followRef = useRef(null)
   const [canRestore, setCanRestore] = useState(() => Boolean(readSession()))
 
   function closeCurrent() {
@@ -77,8 +78,17 @@ export function useRoom() {
       setPresence(msg.presence)
       setRematch(msg.rematch)
       setYou(msg.state.you)
-      settle()
       setError('')
+      const follow = followRef.current
+      const needsFollow = msg.state.phase === 'ability' && msg.state.turn === msg.state.you && follow
+      followRef.current = null
+      if (needsFollow) {
+        pendingRef.current = true
+        setPending(true)
+        if (!send({ type: 'ability', choice: follow })) settle()
+        return
+      }
+      settle()
       return
     }
     if (msg.type === 'error') {
@@ -187,11 +197,15 @@ export function useRoom() {
       }
       openSocket({ type: 'reconnect', code: saved.code, token: saved.token })
     },
-    move(delta) {
+    move(delta, ability) {
       if (pendingRef.current) return
+      followRef.current = delta === 4 ? null : (ability === 'lock' || ability === 'blind' ? ability : 'skip')
       pendingRef.current = true
       setPending(true)
-      if (!send({ type: 'move', delta })) settle()
+      if (!send({ type: 'move', delta })) {
+        followRef.current = null
+        settle()
+      }
     },
     ability(choice) {
       if (pendingRef.current) return

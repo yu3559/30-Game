@@ -50,30 +50,22 @@ export function App() {
     setPanel('local')
   }
 
-  function commitMove(delta) {
+  function commitMove(delta, ability) {
     if (!accepting.current) return
     const current = gameRef.current
     if (!current || current.phase !== 'play') return
     const actor = current.turn
-    const result = applyMove(current, actor, delta)
+    let result = applyMove(current, actor, delta)
     if (!result.ok) return
+    if (result.state.phase === 'ability') {
+      const choice = ability === 'lock' || ability === 'blind' ? ability : 'skip'
+      result = chooseAbility(result.state, actor, choice)
+      if (!result.ok) return
+    }
     gameRef.current = result.state
     setGame(result.state)
-    if (result.state.phase === 'ability') return
     accepting.current = false
     if (result.state.phase !== 'over') setHandoff(true)
-  }
-
-  function commitAbility(choice) {
-    if (!accepting.current) return
-    const current = gameRef.current
-    if (!current || current.phase !== 'ability') return
-    const result = chooseAbility(current, current.turn, choice)
-    if (!result.ok) return
-    gameRef.current = result.state
-    setGame(result.state)
-    accepting.current = false
-    setHandoff(true)
   }
 
   function rematchLocal() {
@@ -112,16 +104,13 @@ export function App() {
         presence={online.presence}
         rematch={online.rematch}
         pending={online.pending}
-        roomCode={online.code}
         muted={muted}
-        rulesOpen={rules}
         error={online.error}
         onToggleMute={toggleMute}
+        onRules={() => setRules(true)}
         onDelta={online.move}
-        onAbility={online.ability}
         onRematch={online.voteRematch}
         onLeave={online.leave}
-        onRules={() => setRules(true)}
       />
     )
   } else if (panel === 'local' && game && handoff && game.phase !== 'over') {
@@ -148,16 +137,13 @@ export function App() {
         presence={null}
         rematch={null}
         pending={false}
-        roomCode=""
         muted={muted}
-        rulesOpen={rules}
         error=""
         onToggleMute={toggleMute}
+        onRules={() => setRules(true)}
         onDelta={commitMove}
-        onAbility={commitAbility}
         onRematch={rematchLocal}
         onLeave={leaveLocal}
-        onRules={() => setRules(true)}
       />
     )
   } else {
