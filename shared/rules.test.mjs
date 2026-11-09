@@ -45,18 +45,18 @@ assert(!applyMove(createGame(), 'p1', 5).ok, 'delta 5 is illegal')
   assert(locked.state.incoming?.type === 'lock', 'lock is queued for the opponent')
   assert(locked.state.abilities.p1.lock === false, 'lock is spent')
   assert(!applyMove(locked.state, 'p2', 2).ok, 'locked player cannot take +2')
-  assert(!applyMove(locked.state, 'p2', 4).ok, 'locked player cannot break')
+  assert(!applyMove(locked.state, 'p2', 4).ok, 'locked player cannot boost')
   const forced = applyMove(locked.state, 'p2', 1)
   assert(forced.ok && forced.state.current === 2, 'locked player can take +1')
 }
 
 {
   const broken = applyMove(createGame(), 'p1', 4)
-  assert(broken.ok && broken.state.phase === 'play', 'break does not open another ability')
-  assert(broken.state.current === 4, 'break adds 4')
-  assert(broken.state.turn === 'p2', 'break ends the turn')
-  assert(broken.state.abilities.p1.break === false, 'break is spent')
-  assert(broken.state.log[0].ability === 'break', 'log records break')
+  assert(broken.ok && broken.state.phase === 'play', 'boost does not open another ability')
+  assert(broken.state.current === 4, 'boost adds 4')
+  assert(broken.state.turn === 'p2', 'boost ends the turn')
+  assert(broken.state.abilities.p1.boost === false, 'boost is spent')
+  assert(broken.state.log[0].ability === 'boost', 'log records boost')
 }
 
 {
@@ -93,8 +93,8 @@ assert(!applyMove(createGame(), 'p1', 5).ok, 'delta 5 is illegal')
   assert(bust.state.loser === 'p2' && bust.state.winner === 'p1', 'the player who reaches 30 loses')
   assert(bust.state.abilities.p2.lock === true, 'a bust does not spend lock or blind')
   const broke = applyMove(state, 'p2', 4)
-  assert(broke.state.current === 33 && broke.state.phase === 'over', 'break can bust')
-  assert(broke.state.abilities.p2.break === false, 'a breaking move spends break even if it busts')
+  assert(broke.state.current === 33 && broke.state.phase === 'over', 'boost can bust')
+  assert(broke.state.abilities.p2.boost === false, 'a boosting move spends boost even if it busts')
 }
 
 {

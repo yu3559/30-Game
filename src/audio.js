@@ -53,7 +53,7 @@ export function play(cue) {
   else if (cue === 'lock') {
     tone(196, 0.08, 'square', 0.018)
     tone(140, 0.1, 'square', 0.018, 0.09)
-  } else if (cue === 'break') tone(460, 0.16, 'sawtooth', 0.018, 0, -300)
+  } else if (cue === 'boost') tone(460, 0.16, 'sawtooth', 0.018, 0, -300)
   else if (cue === 'blind') tone(250, 0.2, 'sine', 0.03, 0, -90)
   else if (cue === 'bust' || cue === 'lose') {
     tone(220, 0.2, 'sine', 0.04, 0, -140)
@@ -84,7 +84,7 @@ export function cueFrom(prev, next, { you, hotseat }) {
     return 'pass'
   }
   const last = next.log?.[next.log.length - 1]
-  if (last?.ability === 'break') return 'break'
+  if (last?.ability === 'boost') return 'boost'
   if (next.phase === 'ability' && prev.phase !== 'ability') return 'move'
   if (next.serial !== prev.serial) return 'move'
   return null

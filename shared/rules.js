@@ -4,7 +4,7 @@
 // オンラインでは、手番が終わるまで相手に新しい数字を送らない（server 側）。
 
 export const LIMIT = 30
-export const ABILITY_KEYS = ['lock', 'break', 'blind']
+export const ABILITY_KEYS = ['lock', 'boost', 'blind']
 
 export function opponent(seat) {
   return seat === 'p1' ? 'p2' : 'p1'
@@ -19,7 +19,7 @@ export function cleanName(value, fallback) {
 }
 
 function freshAbilities() {
-  return { lock: true, break: true, blind: true }
+  return { lock: true, boost: true, blind: true }
 }
 
 export function createGame({ starter = 'p1', names } = {}) {
@@ -69,13 +69,13 @@ export function applyMove(state, seat, delta) {
 
   const constraint = activeConstraint(state)
   if (constraint === 'lock' && delta !== 1) return fail('LOCK中は +1 しか選べません')
-  if (delta === 4 && !state.abilities[seat].break) return fail('BOOST はもう使えません')
+  if (delta === 4 && !state.abilities[seat].boost) return fail('BOOST はもう使えません')
 
   const from = state.current
   const to = from + delta
   const next = structuredClone(state)
   next.serial += 1
-  if (delta === 4) next.abilities[seat].break = false
+  if (delta === 4) next.abilities[seat].boost = false
   next.current = to
   next.log = [
     ...next.log,
@@ -85,7 +85,7 @@ export function applyMove(state, seat, delta) {
       delta,
       from,
       to,
-      ability: delta === 4 ? 'break' : null,
+      ability: delta === 4 ? 'boost' : null,
     },
   ]
 

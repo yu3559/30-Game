@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 const ABILITIES = [
   ['lock', 'LOCK'],
-  ['break', 'BOOST'],
+  ['boost', 'BOOST'],
   ['blind', 'BLIND'],
 ]
 
@@ -154,8 +154,8 @@ export function Game({
               </button>
               <button
                 type="button"
-                className={mine.break ? '' : 'spent'}
-                disabled={!canPlay || !mine.break || view.locked}
+                className={mine.boost ? '' : 'spent'}
+                disabled={!canPlay || !mine.boost || view.locked}
                 onClick={() => play(4)}
               >
                 BOOST
