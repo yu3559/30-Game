@@ -4,9 +4,13 @@
 
 同じ端末で交代するローカル対戦と、4文字のコードで部屋を立てるオンライン対戦があります。
 
+![対戦画面](docs/screen.png)
+
 ## 遊び方
 
 ```
+git clone https://github.com/yu3559/30-Game.git
+cd 30-Game
 npm install
 npm run dev
 ```
