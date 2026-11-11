@@ -187,17 +187,20 @@ export function useRoom() {
       }
       openSocket({ type: 'reconnect', code: saved.code, token: saved.token })
     },
-    move(delta) {
+    move(action) {
       if (pendingRef.current) return
       pendingRef.current = true
       setPending(true)
-      if (!send({ type: 'move', delta })) settle()
+      const payload = typeof action === 'number'
+        ? { type: 'move', delta: action }
+        : { type: 'move', card: action.card }
+      if (!send(payload)) settle()
     },
-    ability(choice) {
+    ability(choice, extra = {}) {
       if (pendingRef.current) return
       pendingRef.current = true
       setPending(true)
-      if (!send({ type: 'ability', choice })) settle()
+      if (!send({ type: 'ability', choice, target: extra.target, give: extra.give, take: extra.take })) settle()
     },
     voteRematch() {
       send({ type: 'rematch' })

@@ -1,4 +1,12 @@
 import { useEffect, useState } from 'react'
+import { ABILITY_INFO, ABILITY_KEYS } from '../shared/rules.js'
+
+const KINDS = [
+  ['move', '進む数', 'BOOST、BACK、SAME'],
+  ['bind', '次の手', 'LOCK、TWIN、HUSH'],
+  ['veil', '隠す', 'BLIND、MASK'],
+  ['hand', '手札', 'SEAL、TRADE'],
+]
 
 export function RulesDialog({ onClose }) {
   useEffect(() => {
@@ -27,21 +35,26 @@ export function RulesDialog({ onClose }) {
           </section>
           <section>
             <h3>能力</h3>
-            <p>2人とも LOCK、BREAK、BLIND を1回ずつ持っています。1ターンに使えるのは1つまでで、使ったかどうかは相手にも分かります。</p>
-            <ul>
-              <li><b>LOCK</b>数字を進めた直後に発動します。相手の次の手は +1 だけになります。</li>
-              <li><b>BREAK</b>自分の手を +4 にできます。+1〜+3 の代わりに使います。</li>
-              <li><b>BLIND</b>数字を進めた直後に発動します。相手の次の1ターンだけ、今の数字と履歴が隠されます。</li>
-            </ul>
+            <p>山札は、10種類の能力が2枚ずつ、合計20枚です。最初に3枚ずつ配ります。残りが山札です。使った能力は捨て札に置き、山札が残っていれば1枚引きます。引いた能力は、そのターンには使えません。山札が尽きたあとは、使った分だけ手札が減ります。1ターンに使えるのは1つまでで、持っている能力は相手にも見えます。</p>
+            {KINDS.map(([kind, title]) => (
+              <div key={kind}>
+                <h3>{title}</h3>
+                <ul>
+                  {ABILITY_KEYS.filter((key) => ABILITY_INFO[key].kind === kind).map((key) => (
+                    <li key={key}><b>{ABILITY_INFO[key].label}</b>{ABILITY_INFO[key].text}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </section>
           <section>
             <h3>定石</h3>
-            <p>能力を使わないとき、1、5、9、13、17、21、25、29 を相手の番にすると有利です。LOCK と BREAK で、この並びは崩れます。</p>
+            <p>能力を使わないあいだは、1、5、9、13、17、21、25、29 を相手の番にすると有利です。</p>
           </section>
           <section>
             <h3>対戦</h3>
-            <p>ローカルは1台の端末を交代で使います。BLIND のあいだは、渡す画面にも数字を出しません。</p>
-            <p>オンラインは4文字のルームコードでつなぎます。BLIND 中の数字は、相手の端末にも送りません。再戦するたびに先手を交代します。</p>
+            <p>ローカルは1台の端末を交代で使います。BLIND のあいだは、渡す画面にも数字を出しません。MASK のあいだは、相手の残り能力を出しません。</p>
+            <p>オンラインは4文字のルームコードでつなぎます。BLIND 中の数字は、相手の端末にも送りません。MASK 中の残り能力も送りません。再戦するたびに先手を交代し、山札を配り直します。</p>
           </section>
         </div>
         <button type="button" className="primary" onClick={onClose}>閉じる</button>
@@ -70,18 +83,12 @@ export function Title({ error, canRestore, onLocal, onCreate, onJoin, onRestore,
         {step === 'home' && (
           <>
             <ul className="ability-cards">
-              <li>
-                <b>LOCK</b>
-                <span>相手の次の手を +1 に固定</span>
-              </li>
-              <li>
-                <b>BREAK</b>
-                <span>自分の手番に +4 できる</span>
-              </li>
-              <li>
-                <b>BLIND</b>
-                <span>相手から数字と履歴を隠す</span>
-              </li>
+              {KINDS.map(([kind, title, names]) => (
+                <li key={kind}>
+                  <b>{title}</b>
+                  <span>{names}</span>
+                </li>
+              ))}
             </ul>
             <div className="actions">
               <button type="button" className="primary" onClick={() => setStep('local')}>ローカルで対戦</button>
@@ -206,7 +213,7 @@ export function Lobby({ code, names, onLeave, onRules }) {
   )
 }
 
-export function Handoff({ name, number, locked, onReady, onRules }) {
+export function Handoff({ name, number, locked, twin, hushed, masked, onReady, onRules }) {
   return (
     <main className="page">
       <section className="frame center-copy handoff">
@@ -218,6 +225,9 @@ export function Handoff({ name, number, locked, onReady, onRules }) {
           <p className="handoff-number" aria-hidden="true">{number}</p>
         )}
         {locked && <p className="note">このターンは +1 だけ選べます。</p>}
+        {twin != null && <p className="note">このターンは +{twin} だけ選べます。</p>}
+        {hushed && <p className="note">このターンは能力を使えません。</p>}
+        {masked && <p className="note">相手の残り能力は隠されています。</p>}
         <p className="lede">端末を渡してから、押してください。</p>
         <div className="actions">
           <button type="button" className="primary" onClick={onReady}>準備できた</button>

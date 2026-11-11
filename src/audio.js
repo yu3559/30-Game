@@ -53,9 +53,13 @@ export function play(cue) {
   else if (cue === 'lock') {
     tone(196, 0.08, 'square', 0.018)
     tone(140, 0.1, 'square', 0.018, 0.09)
-  } else if (cue === 'break') tone(460, 0.16, 'sawtooth', 0.018, 0, -300)
+  } else if (cue === 'boost') tone(460, 0.16, 'sawtooth', 0.018, 0, -300)
+  else if (cue === 'back') tone(180, 0.12, 'triangle', 0.02, 0, -40)
   else if (cue === 'blind') tone(250, 0.2, 'sine', 0.03, 0, -90)
-  else if (cue === 'bust' || cue === 'lose') {
+  else if (cue === 'seal') {
+    tone(330, 0.06, 'square', 0.015)
+    tone(220, 0.08, 'square', 0.015, 0.07)
+  } else if (cue === 'bust' || cue === 'lose') {
     tone(220, 0.2, 'sine', 0.04, 0, -140)
     tone(110, 0.28, 'triangle', 0.03, 0.08)
   } else if (cue === 'win') {
@@ -72,19 +76,29 @@ export function cueFrom(prev, next, { you, hotseat }) {
     && prev.phase === next.phase
     && prev.blinded === next.blinded
     && prev.locked === next.locked
+    && prev.twin === next.twin
+    && prev.hushed === next.hushed
+    && prev.masked === next.masked
   ) return null
   if (next.phase === 'over' && prev.phase !== 'over') {
     return hotseat ? 'bust' : (next.winner === you ? 'win' : 'lose')
   }
   if (next.blinded && !prev.blinded) return 'blind'
+  if (next.masked && !prev.masked) return 'blind'
   if (next.locked && !prev.locked) return 'lock'
+  if (next.twin && !prev.twin) return 'lock'
+  if (next.hushed && !prev.hushed) return 'lock'
   if (prev.phase === 'ability' && next.phase === 'play') {
-    if (next.incoming?.type === 'blind' && next.incoming.target === next.turn) return 'blind'
-    if (next.incoming?.type === 'lock' && next.incoming.target === next.turn) return 'lock'
+    const type = next.incoming?.type
+    if (type === 'blind' || type === 'mask') return 'blind'
+    if (type === 'lock' || type === 'twin' || type === 'hush') return 'lock'
+    const spent = next.log?.[next.log.length - 1]?.ability
+    if (spent === 'seal' || spent === 'trade') return 'seal'
     return 'pass'
   }
   const last = next.log?.[next.log.length - 1]
-  if (last?.ability === 'break') return 'break'
+  if (last?.ability === 'boost' || last?.ability === 'same') return 'boost'
+  if (last?.ability === 'back') return 'back'
   if (next.phase === 'ability' && prev.phase !== 'ability') return 'move'
   if (next.serial !== prev.serial) return 'move'
   return null

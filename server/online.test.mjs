@@ -1,4 +1,5 @@
 import { WebSocket } from 'ws'
+import { createGame } from '../shared/rules.js'
 import { startServer } from './index.mjs'
 
 let failed = 0
@@ -45,7 +46,23 @@ function waitFor(messages, pred, timeout = 2000) {
   })
 }
 
-const server = await startServer({ port: 0, host: '127.0.0.1' })
+function cardId(view, type) {
+  return view.hands[view.you].find((card) => card.type === type)?.id
+}
+
+const server = await startServer({
+  port: 0,
+  host: '127.0.0.1',
+  create: (options) => createGame({
+    ...options,
+    order: [
+      'blind', 'lock', 'boost',
+      'lock', 'boost', 'back',
+      'hush', 'twin', 'twin', 'same', 'same', 'back',
+      'mask', 'mask', 'seal', 'seal', 'trade', 'trade', 'hush', 'blind',
+    ],
+  }),
+})
 
 try {
   const host = await connect(server.port)
@@ -69,13 +86,15 @@ try {
   assert(guestPending.state.current === 0 && guestPending.state.phase === 'play', 'opponent keeps the previous number')
   assert(!JSON.stringify(guestPending).includes('"current":2'), 'pending payload hides the new number')
 
-  host.send({ type: 'ability', choice: 'blind' })
+  host.send({ type: 'ability', choice: cardId(hostAbility.state, 'blind') })
   const masked = await waitFor(guest.messages, (msg) => msg.type === 'state' && msg.state.blinded === true)
   const caster = await waitFor(host.messages, (msg) => msg.type === 'state' && msg.state.turn === 'p2')
   assert(masked.state.current === null && masked.state.log === null, 'blind hides the board')
   assert(caster.state.current === 2 && caster.state.blinded === false, 'caster keeps the number')
   const maskedRaw = JSON.stringify(masked)
   assert(!maskedRaw.includes('"current":2') && !maskedRaw.includes('"to":2'), 'blind payload does not leak digits')
+  assert(caster.state.hands.p1.some((card) => card.type === 'hush'), 'using blind draws a replacement')
+  assert(masked.state.hands.p1.some((card) => card.type === 'hush'), 'the opponent can see the drawn card')
 
   const hostMark = host.messages.length
   guest.send({ type: 'move', delta: 2 })
@@ -99,8 +118,8 @@ try {
   assert(revealed.state.blinded === false, 'the number returns after the blind turn')
 
   host.send({ type: 'move', delta: 1 })
-  await waitFor(host.messages, (msg) => msg.type === 'state' && msg.state.phase === 'ability')
-  host.send({ type: 'ability', choice: 'lock' })
+  const lockWindow = await waitFor(host.messages, (msg) => msg.type === 'state' && msg.state.phase === 'ability')
+  host.send({ type: 'ability', choice: cardId(lockWindow.state, 'lock') })
   await waitFor(guest.messages, (msg) => msg.type === 'state' && msg.state.locked === true && msg.state.phase === 'play')
   const errorMark = guest.messages.length
   guest.send({ type: 'move', delta: 3 })

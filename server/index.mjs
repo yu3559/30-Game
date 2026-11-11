@@ -155,10 +155,11 @@ function seatByToken(room, token) {
   return null
 }
 
-export function startServer({ port = 0, host = '127.0.0.1', serveStatic = false } = {}) {
+export function startServer({ port = 0, host = '127.0.0.1', serveStatic = false, create = createGame } = {}) {
   const ctx = {
     rooms: new Map(),
     sockets: new Map(),
+    create,
   }
 
   const server = http.createServer((req, res) => {
@@ -268,7 +269,7 @@ function handle(ctx, ws, msg) {
     room.players.p2.name = cleanName(msg.name, 'プレイヤー2')
     release(ctx, ws, { explicit: false })
     bind(ctx, ws, room, 'p2', token)
-    room.publicState = createGame({
+    room.publicState = ctx.create({
       starter: 'p1',
       names: { p1: room.players.p1.name, p2: room.players.p2.name },
     })
@@ -325,7 +326,8 @@ function handle(ctx, ws, msg) {
       send(ws, { type: 'error', message: '先に能力を選んでください' })
       return
     }
-    const result = applyMove(room.publicState, meta.seat, msg.delta)
+    const action = typeof msg.card === 'string' ? { card: msg.card } : msg.delta
+    const result = applyMove(room.publicState, meta.seat, action)
     if (!result.ok) {
       send(ws, { type: 'error', message: result.error })
       return
@@ -342,7 +344,11 @@ function handle(ctx, ws, msg) {
       send(ws, { type: 'error', message: '今は能力を選べません' })
       return
     }
-    const result = chooseAbility(room.privateState, meta.seat, msg.choice)
+    const result = chooseAbility(room.privateState, meta.seat, msg.choice, {
+      target: msg.target,
+      give: msg.give,
+      take: msg.take,
+    })
     if (!result.ok) {
       send(ws, { type: 'error', message: result.error })
       return

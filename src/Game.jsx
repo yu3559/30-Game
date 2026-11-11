@@ -1,45 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
+import { ABILITY_INFO } from '../shared/rules.js'
 
-const SEALS = [
-  ['lock', 'LOCK', '相手を +1 に固定'],
-  ['break', 'BREAK', '+4 で進める'],
-  ['blind', 'BLIND', '数字と履歴を隠す'],
-]
-
-function Icon({ name }) {
-  if (name === 'lock') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="5" y="11" width="14" height="9" rx="2" />
-        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-      </svg>
-    )
-  }
-  if (name === 'break') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M13 3 6 13h6l-1 8 8-12h-6l0-6z" />
-      </svg>
-    )
-  }
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" />
-      <path d="M4 19 20 5" />
-    </svg>
-  )
+function signed(delta) {
+  if (delta > 0) return `+${delta}`
+  return String(delta)
 }
 
-function Seals({ kit }) {
+function lastOpponentDelta(log, seat) {
+  if (!log) return null
+  for (let i = log.length - 1; i >= 0; i -= 1) {
+    if (log[i].player !== seat) return log[i].delta
+  }
+  return null
+}
+
+function movePreview(type, current, echoed) {
+  if (type === 'boost') return 4
+  if (type === 'back') return -1
+  if (type === 'same') return echoed
+  return null
+}
+
+function Hand({ cards }) {
+  if (cards == null) return <p className="hand is-hidden">非表示</p>
+  if (cards.length === 0) return <p className="hand">なし</p>
   return (
-    <div className="seals">
-      {SEALS.map(([key, label, detail]) => (
-        <span
-          key={key}
-          className={kit[key] ? `seal ${key}` : `seal ${key} spent`}
-          title={`${label} ${kit[key] ? '未使用' : '使用済み'}。${detail}`}
-        >
-          <Icon name={key} />
+    <div className="hand">
+      {cards.map((card) => (
+        <span key={card.id} className={`chip kind-${ABILITY_INFO[card.type].kind}`}>
+          {ABILITY_INFO[card.type].label}
         </span>
       ))}
     </div>
@@ -68,9 +57,15 @@ function Track({ value }) {
 function hintText(view, you) {
   if (view.phase === 'over') return '30以上に到達しました'
   if (view.blinded) return '数字と履歴が隠されています。記憶を頼りに選んでください'
+  if (view.masked) return '相手の残り能力は隠されています'
   if (view.turn !== you && view.incoming?.type === 'blind') return '相手には、数字と履歴が見えていません'
+  if (view.turn !== you && view.incoming?.type === 'mask') return '相手には、あなたの残り能力が見えていません'
   if (view.turn !== you && view.incoming?.type === 'lock') return '相手は LOCK 中です。選べるのは +1 だけです'
+  if (view.turn !== you && view.incoming?.type === 'twin') return `相手の次の手は +${view.incoming.delta} だけです`
+  if (view.turn !== you && view.incoming?.type === 'hush') return '相手は次の手で能力を使えません'
   if (view.phase === 'play' && view.locked) return 'LOCK 中です。選べるのは +1 だけです'
+  if (view.phase === 'play' && view.twin) return `このターンは +${view.twin} だけです`
+  if (view.phase === 'play' && view.hushed) return 'このターンは能力を使えません'
   if (view.current >= 29) return 'どの手でも 30 以上になります'
   if (view.current >= 27) return '次の一手で 30 に届くかもしれません'
   return '30以上にした人が負け'
@@ -95,16 +90,21 @@ export function Game({
   onRules,
 }) {
   const [ask, setAsk] = useState(null)
+  const [pick, setPick] = useState(null)
   const logRef = useRef(null)
   const choiceRef = useRef(null)
   const partner = you === 'p1' ? 'p2' : 'p1'
   const partnerHere = mode !== 'online' || Boolean(presence?.[partner])
   const canPlay = view.phase === 'play' && view.turn === you && partnerHere && !pending
   const canChoose = view.phase === 'ability' && view.turn === you && partnerHere && !pending
-  const kit = view.abilities[view.turn]
+  const mine = you ? view.hands?.[you] : null
+  const theirs = you ? view.hands?.[partner] : null
+  const echoed = lastOpponentDelta(view.log, you)
+  const numbersBlocked = view.locked || view.twin != null
 
   useEffect(() => {
     setAsk(null)
+    setPick(null)
   }, [view.serial, view.phase])
 
   useEffect(() => {
@@ -116,19 +116,34 @@ export function Game({
     if (canChoose) choiceRef.current?.focus()
   }, [canChoose])
 
+  function playMove(action, delta) {
+    if (view.current != null && view.current + delta >= 30) {
+      setAsk({ kind: 'bust', action, delta })
+      return
+    }
+    onDelta(action)
+  }
+
   function request(delta) {
     if (!canPlay) return
     if (view.locked && delta !== 1) return
-    if (delta === 4 && !kit.break) return
-    if (delta === 4) {
-      setAsk({ kind: 'break', delta })
+    if (view.twin != null && delta !== view.twin) return
+    playMove(delta, delta)
+  }
+
+  function requestCard(card) {
+    if (!canPlay || view.hushed || numbersBlocked) return
+    const info = ABILITY_INFO[card.type]
+    if (info.timing !== 'move') return
+    const delta = movePreview(card.type, view.current, echoed)
+    if (card.type === 'back' && view.current === 0) return
+    if (card.type === 'same' && delta == null && view.log) return
+    if (delta == null) {
+      onDelta({ card: card.id })
       return
     }
-    if (view.current != null && view.current + delta >= 30) {
-      setAsk({ kind: 'bust', delta })
-      return
-    }
-    onDelta(delta)
+    if (view.current != null && view.current + delta < 0) return
+    playMove({ card: card.id }, delta)
   }
 
   useEffect(() => {
@@ -136,20 +151,17 @@ export function Game({
       if (event.repeat || rulesOpen) return
       const tag = event.target?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (ask) {
-        if (event.key === 'Escape') setAsk(null)
-        return
-      }
-      if (canChoose) {
-        if (event.key.toLowerCase() === 'l' && kit.lock) onAbility('lock')
-        if (event.key.toLowerCase() === 'b' && kit.blind) onAbility('blind')
+      if (ask || pick) {
+        if (event.key === 'Escape') {
+          setAsk(null)
+          setPick(null)
+        }
         return
       }
       if (!canPlay) return
       if (event.key === '1') request(1)
       if (event.key === '2') request(2)
       if (event.key === '3') request(3)
-      if (event.key === '4') request(4)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -167,10 +179,23 @@ export function Game({
 
   const voted = Boolean(rematch?.[you])
   const otherVoted = Boolean(rematch?.[partner])
+  const moveCards = (mine || []).filter((card) => ABILITY_INFO[card.type].timing === 'move')
+  const afterCards = (mine || []).filter((card) => ABILITY_INFO[card.type].timing === 'after')
+
+  function cardLine(card) {
+    const info = ABILITY_INFO[card.type]
+    const delta = movePreview(card.type, view.current, echoed)
+    if (card.type === 'same' && delta == null) return view.log ? 'まだ使えない' : '相手と同じ数'
+    if (card.type === 'back' && view.current === 0) return '0からは不可'
+    if (delta == null || view.current == null) return info.text
+    const land = view.current + delta
+    if (land < 0) return '0未満は不可'
+    return land >= 30 ? '負け' : `${signed(delta)} → ${land}`
+  }
 
   return (
     <main className="page">
-      <section className={`frame board ${view.blinded ? 'is-blind' : ''} ${view.locked ? 'is-lock' : ''}`}>
+      <section className={`frame board ${view.blinded ? 'is-blind' : ''} ${view.locked || view.twin != null ? 'is-lock' : ''}`}>
         <header className="topbar">
           <div>
             <p className="brand">30を言ったら負け</p>
@@ -188,13 +213,16 @@ export function Game({
             <article key={seat} className={`player ${seat} ${view.turn === seat && view.phase !== 'over' ? 'active' : ''}`}>
               <div className="player-top">
                 <strong>{view.names[seat]}</strong>
-                {seat === you && <em>あなた</em>}
+                <span className="player-marks">
+                  {seat === you && <em>あなた</em>}
+                  {view.starter === seat && <span className="badge">先手</span>}
+                </span>
               </div>
-              <Seals kit={view.abilities[seat]} />
-              {view.starter === seat && <span className="badge">先手</span>}
+              <Hand cards={view.hands[seat]} />
             </article>
           ))}
         </div>
+        <p className="deck-count">山札 {view.deck}</p>
 
         <p className="sr-only" aria-live="polite">{status}</p>
 
@@ -209,14 +237,17 @@ export function Game({
         <ol className="log" ref={logRef}>
           {view.log == null && <li className="mask">履歴は隠されています</li>}
           {view.log && view.log.length === 0 && <li className="empty">まだ手は進んでいません</li>}
-          {view.log?.map((entry) => (
-            <li key={entry.id} className={`entry ${entry.player}`}>
-              <span className="who">{view.names[entry.player]}</span>
-              <span className="what">+{entry.delta}</span>
-              {entry.ability && <span className={`tag ${entry.ability}`}>{entry.ability.toUpperCase()}</span>}
-              <span className="landed">{entry.to}</span>
-            </li>
-          ))}
+          {view.log?.map((entry) => {
+            const info = entry.ability ? ABILITY_INFO[entry.ability] : null
+            return (
+              <li key={entry.id} className={`entry ${entry.player}`}>
+                <span className="who">{view.names[entry.player]}</span>
+                <span className="what">{signed(entry.delta)}</span>
+                {info && <span className={`tag kind-${info.kind}`}>{info.label}</span>}
+                <span className="landed">{entry.to}</span>
+              </li>
+            )
+          })}
         </ol>
 
         {error && <p className="banner warn">{error}</p>}
@@ -235,13 +266,13 @@ export function Game({
                 <p className="note">
                   {voted && !otherVoted && '相手の同意を待っています。'}
                   {!voted && otherVoted && '相手が再戦を待っています。'}
-                  2人とも押すと、先手を交代して再開します。
+                  2人とも押すと、先手を交代して、山札を配り直します。
                 </p>
               </>
             ) : (
               <>
                 <button type="button" className="primary" onClick={onRematch}>もう一局</button>
-                <p className="note">先手を交代して再開します。</p>
+                <p className="note">先手を交代して、山札を配り直します。</p>
               </>
             )}
             <button type="button" className="ghost" onClick={onLeave}>タイトルへ</button>
@@ -251,39 +282,103 @@ export function Game({
             {ask && (
               <div className="ask">
                 <p>
-                  {ask.kind === 'break' && view.current == null && 'BREAK を使い、+4 します。この対戦ではもう使えません。'}
-                  {ask.kind === 'break' && view.current != null && view.current + 4 >= 30
-                    && `BREAK で ${view.current} から ${view.current + 4} になります。30以上なので、あなたの負けです。`}
-                  {ask.kind === 'break' && view.current != null && view.current + 4 < 30
-                    && `BREAK で ${view.current} から ${view.current + 4} へ進みます。この対戦ではもう使えません。`}
-                  {ask.kind === 'bust' && view.current != null
-                    && `+${ask.delta} すると ${view.current + ask.delta} になります。30以上なので、あなたの負けです。`}
+                  {signed(ask.delta)} すると {view.current + ask.delta} になります。30以上なので、あなたの負けです。
                 </p>
                 <div className="ask-actions">
                   <button type="button" className="ghost" onClick={() => setAsk(null)}>やめる</button>
-                  <button type="button" className="primary" onClick={() => { const delta = ask.delta; setAsk(null); onDelta(delta) }}>
+                  <button type="button" className="primary" onClick={() => { const action = ask.action; setAsk(null); onDelta(action) }}>
                     進める
                   </button>
                 </div>
               </div>
             )}
 
-            {canChoose && !ask && (
+            {canChoose && !ask && pick?.step === 'take' && (
+              <div className="choice">
+                <h3>SEAL</h3>
+                <p>相手のどの能力を捨てさせますか。</p>
+                {(theirs || []).map((card) => (
+                  <button
+                    key={card.id}
+                    type="button"
+                    className={`choice-btn kind-${ABILITY_INFO[card.type].kind}`}
+                    onClick={() => onAbility(pick.card.id, { target: card.id })}
+                  >
+                    <span>{ABILITY_INFO[card.type].label}</span>
+                    <small>{ABILITY_INFO[card.type].text}</small>
+                  </button>
+                ))}
+                <button type="button" className="ghost" onClick={() => setPick(null)}>戻る</button>
+              </div>
+            )}
+
+            {canChoose && !ask && pick?.step === 'give' && (
+              <div className="choice">
+                <h3>TRADE</h3>
+                <p>相手に渡す自分の能力を選んでください。</p>
+                {afterCards.filter((card) => card.id !== pick.card.id).concat(moveCards).map((card) => (
+                  <button
+                    key={card.id}
+                    type="button"
+                    className={`choice-btn kind-${ABILITY_INFO[card.type].kind}`}
+                    onClick={() => setPick({ card: pick.card, give: card.id, step: 'receive' })}
+                  >
+                    <span>{ABILITY_INFO[card.type].label}</span>
+                  </button>
+                ))}
+                <button type="button" className="ghost" onClick={() => setPick(null)}>戻る</button>
+              </div>
+            )}
+
+            {canChoose && !ask && pick?.step === 'receive' && (
+              <div className="choice">
+                <h3>TRADE</h3>
+                <p>受け取る相手の能力を選んでください。</p>
+                {(theirs || []).map((card) => (
+                  <button
+                    key={card.id}
+                    type="button"
+                    className={`choice-btn kind-${ABILITY_INFO[card.type].kind}`}
+                    onClick={() => onAbility(pick.card.id, { give: pick.give, take: card.id })}
+                  >
+                    <span>{ABILITY_INFO[card.type].label}</span>
+                  </button>
+                ))}
+                <button type="button" className="ghost" onClick={() => setPick({ card: pick.card, step: 'give' })}>戻る</button>
+              </div>
+            )}
+
+            {canChoose && !ask && !pick && (
               <div className="choice" ref={choiceRef} tabIndex={-1}>
                 <h3>{view.blinded ? '数字は隠れたままです' : `${view.current} になりました`}</h3>
-                <p>このターンに能力を1つ使えます。</p>
-                {kit.lock && (
-                  <button type="button" className="choice-btn lock" onClick={() => onAbility('lock')}>
-                    <span>LOCK</span>
-                    <small>相手の次の手を +1 だけにする</small>
-                  </button>
-                )}
-                {kit.blind && (
-                  <button type="button" className="choice-btn blind" onClick={() => onAbility('blind')}>
-                    <span>BLIND</span>
-                    <small>相手の次の手で、数字と履歴を隠す</small>
-                  </button>
-                )}
+                <p>このターンに能力を1つ使えます。使うと山札から1枚引きます。</p>
+                {afterCards.map((card) => {
+                  const info = ABILITY_INFO[card.type]
+                  const blocked = (card.type === 'seal' || card.type === 'trade') && !theirs
+                  const emptyGive = card.type === 'trade' && mine.length < 2
+                  const emptyTake = (card.type === 'seal' || card.type === 'trade') && theirs && theirs.length === 0
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={`choice-btn kind-${info.kind}`}
+                      disabled={blocked || emptyGive || emptyTake}
+                      onClick={() => {
+                        if (card.type === 'seal') setPick({ card, step: 'take' })
+                        else if (card.type === 'trade') setPick({ card, step: 'give' })
+                        else onAbility(card.id)
+                      }}
+                    >
+                      <span>{info.label}</span>
+                      <small>
+                        {blocked && '相手の能力が見えないので選べません'}
+                        {!blocked && emptyGive && '渡す能力が残っていません'}
+                        {!blocked && !emptyGive && emptyTake && '相手に能力がありません'}
+                        {!blocked && !emptyGive && !emptyTake && info.text}
+                      </small>
+                    </button>
+                  )
+                })}
                 <button type="button" className="ghost" onClick={() => onAbility('skip')}>能力を使わない</button>
               </div>
             )}
@@ -292,12 +387,13 @@ export function Game({
               <div className="moves">
                 {[1, 2, 3].map((delta) => {
                   const bust = view.current != null && view.current + delta >= 30
+                  const disabled = (view.locked && delta !== 1) || (view.twin != null && delta !== view.twin)
                   return (
                     <button
                       key={delta}
                       type="button"
                       className={bust ? 'move danger' : 'move'}
-                      disabled={view.locked && delta !== 1}
+                      disabled={disabled}
                       onClick={() => request(delta)}
                     >
                       +{delta}
@@ -305,20 +401,23 @@ export function Game({
                     </button>
                   )
                 })}
-                <button
-                  type="button"
-                  className="move break-btn"
-                  disabled={!kit.break || view.locked}
-                  onClick={() => request(4)}
-                >
-                  BREAK
-                  <small>
-                    {!kit.break && '使用済み'}
-                    {kit.break && view.locked && '+4 は不可'}
-                    {kit.break && !view.locked && view.current == null && '+4'}
-                    {kit.break && !view.locked && view.current != null && (view.current + 4 >= 30 ? '負け' : `+4 → ${view.current + 4}`)}
-                  </small>
-                </button>
+                {!view.hushed && !numbersBlocked && moveCards.map((card) => {
+                  const info = ABILITY_INFO[card.type]
+                  const line = cardLine(card)
+                  const disabled = line === 'まだ使えない' || line === '0からは不可' || line === '0未満は不可'
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={`move ability-move kind-${info.kind} ${line === '負け' ? 'danger' : ''}`}
+                      disabled={disabled}
+                      onClick={() => requestCard(card)}
+                    >
+                      {info.label}
+                      <small>{line}</small>
+                    </button>
+                  )
+                })}
               </div>
             )}
 

@@ -12,6 +12,7 @@ export function App() {
   const [game, setGame] = useState(null)
   const [handoff, setHandoff] = useState(false)
   const [muted, setMutedState] = useState(getMuted)
+  const [localError, setLocalError] = useState('')
   const gameRef = useRef(null)
   const heard = useRef(null)
   const accepting = useRef(true)
@@ -47,16 +48,21 @@ export function App() {
     accepting.current = true
     setGame(next)
     setHandoff(false)
+    setLocalError('')
     setPanel('local')
   }
 
-  function commitMove(delta) {
+  function commitMove(action) {
     if (!accepting.current) return
     const current = gameRef.current
     if (!current || current.phase !== 'play') return
     const actor = current.turn
-    const result = applyMove(current, actor, delta)
-    if (!result.ok) return
+    const result = applyMove(current, actor, action)
+    if (!result.ok) {
+      setLocalError(result.error)
+      return
+    }
+    setLocalError('')
     gameRef.current = result.state
     setGame(result.state)
     if (result.state.phase === 'ability') return
@@ -64,12 +70,16 @@ export function App() {
     if (result.state.phase !== 'over') setHandoff(true)
   }
 
-  function commitAbility(choice) {
+  function commitAbility(choice, extra) {
     if (!accepting.current) return
     const current = gameRef.current
     if (!current || current.phase !== 'ability') return
-    const result = chooseAbility(current, current.turn, choice)
-    if (!result.ok) return
+    const result = chooseAbility(current, current.turn, choice, extra)
+    if (!result.ok) {
+      setLocalError(result.error)
+      return
+    }
+    setLocalError('')
     gameRef.current = result.state
     setGame(result.state)
     accepting.current = false
@@ -88,6 +98,7 @@ export function App() {
     gameRef.current = null
     setGame(null)
     setHandoff(false)
+    setLocalError('')
     setPanel('home')
   }
 
@@ -125,13 +136,17 @@ export function App() {
       />
     )
   } else if (panel === 'local' && game && handoff && game.phase !== 'over') {
-    const blinded = game.incoming?.type === 'blind' && game.incoming.target === game.turn
-    const locked = game.incoming?.type === 'lock' && game.incoming.target === game.turn
+    const incoming = game.incoming?.target === game.turn ? game.incoming : null
+    const blinded = incoming?.type === 'blind'
+    const locked = incoming?.type === 'lock'
     body = (
       <Handoff
         name={game.names[game.turn]}
         number={blinded ? null : game.current}
         locked={locked}
+        twin={incoming?.type === 'twin' ? incoming.delta : null}
+        hushed={incoming?.type === 'hush'}
+        masked={incoming?.type === 'mask'}
         onReady={() => {
           accepting.current = true
           setHandoff(false)
@@ -151,7 +166,7 @@ export function App() {
         roomCode=""
         muted={muted}
         rulesOpen={rules}
-        error=""
+        error={localError}
         onToggleMute={toggleMute}
         onDelta={commitMove}
         onAbility={commitAbility}
