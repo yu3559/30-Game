@@ -32,6 +32,7 @@ export function useRoom() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const pendingRef = useRef(false)
+  const followRef = useRef(null)
   const [canRestore, setCanRestore] = useState(() => Boolean(readSession()))
 
   function closeCurrent() {
@@ -77,8 +78,20 @@ export function useRoom() {
       setPresence(msg.presence)
       setRematch(msg.rematch)
       setYou(msg.state.you)
-      settle()
       setError('')
+      const follow = followRef.current
+      const needsFollow = msg.state.phase === 'ability' && msg.state.turn === msg.state.you && follow
+      followRef.current = null
+      if (needsFollow) {
+        pendingRef.current = true
+        setPending(true)
+        const payload = typeof follow === 'string'
+          ? { type: 'ability', choice: follow }
+          : { type: 'ability', choice: follow.choice, target: follow.target, give: follow.give, take: follow.take }
+        if (!send(payload)) settle()
+        return
+      }
+      settle()
       return
     }
     if (msg.type === 'error') {
@@ -189,12 +202,21 @@ export function useRoom() {
     },
     move(action) {
       if (pendingRef.current) return
+      const playingCard = action?.card && action.delta == null
+      followRef.current = playingCard
+        ? null
+        : (action?.card
+          ? { choice: action.card, target: action.target, give: action.give, take: action.take }
+          : 'skip')
       pendingRef.current = true
       setPending(true)
-      const payload = typeof action === 'number'
-        ? { type: 'move', delta: action }
-        : { type: 'move', card: action.card }
-      if (!send(payload)) settle()
+      const payload = playingCard
+        ? { type: 'move', card: action.card }
+        : { type: 'move', delta: action.delta }
+      if (!send(payload)) {
+        followRef.current = null
+        settle()
+      }
     },
     ability(choice, extra = {}) {
       if (pendingRef.current) return

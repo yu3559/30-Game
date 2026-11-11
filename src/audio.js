@@ -53,13 +53,10 @@ export function play(cue) {
   else if (cue === 'lock') {
     tone(196, 0.08, 'square', 0.018)
     tone(140, 0.1, 'square', 0.018, 0.09)
-  } else if (cue === 'boost') tone(460, 0.16, 'sawtooth', 0.018, 0, -300)
+  }   else if (cue === 'boost') tone(460, 0.16, 'sawtooth', 0.018, 0, -300)
   else if (cue === 'back') tone(180, 0.12, 'triangle', 0.02, 0, -40)
   else if (cue === 'blind') tone(250, 0.2, 'sine', 0.03, 0, -90)
-  else if (cue === 'seal') {
-    tone(330, 0.06, 'square', 0.015)
-    tone(220, 0.08, 'square', 0.015, 0.07)
-  } else if (cue === 'bust' || cue === 'lose') {
+  else if (cue === 'bust' || cue === 'lose') {
     tone(220, 0.2, 'sine', 0.04, 0, -140)
     tone(110, 0.28, 'triangle', 0.03, 0.08)
   } else if (cue === 'win') {
@@ -92,8 +89,6 @@ export function cueFrom(prev, next, { you, hotseat }) {
     const type = next.incoming?.type
     if (type === 'blind' || type === 'mask') return 'blind'
     if (type === 'lock' || type === 'twin' || type === 'hush') return 'lock'
-    const spent = next.log?.[next.log.length - 1]?.ability
-    if (spent === 'seal' || spent === 'trade') return 'seal'
     return 'pass'
   }
   const last = next.log?.[next.log.length - 1]

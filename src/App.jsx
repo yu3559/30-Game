@@ -48,7 +48,6 @@ export function App() {
     accepting.current = true
     setGame(next)
     setHandoff(false)
-    setLocalError('')
     setPanel('local')
   }
 
@@ -57,15 +56,26 @@ export function App() {
     const current = gameRef.current
     if (!current || current.phase !== 'play') return
     const actor = current.turn
-    const result = applyMove(current, actor, action)
+    const input = action.delta == null ? { card: action.card } : action.delta
+    let result = applyMove(current, actor, input)
     if (!result.ok) {
       setLocalError(result.error)
       return
     }
+    if (result.state.phase === 'ability') {
+      result = chooseAbility(result.state, actor, action.card || 'skip', {
+        target: action.target,
+        give: action.give,
+        take: action.take,
+      })
+      if (!result.ok) {
+        setLocalError(result.error)
+        return
+      }
+    }
     setLocalError('')
     gameRef.current = result.state
     setGame(result.state)
-    if (result.state.phase === 'ability') return
     accepting.current = false
     if (result.state.phase !== 'over') setHandoff(true)
   }
@@ -83,7 +93,7 @@ export function App() {
     gameRef.current = result.state
     setGame(result.state)
     accepting.current = false
-    setHandoff(true)
+    if (result.state.phase !== 'over') setHandoff(true)
   }
 
   function rematchLocal() {
@@ -98,7 +108,6 @@ export function App() {
     gameRef.current = null
     setGame(null)
     setHandoff(false)
-    setLocalError('')
     setPanel('home')
   }
 
@@ -123,27 +132,23 @@ export function App() {
         presence={online.presence}
         rematch={online.rematch}
         pending={online.pending}
-        roomCode={online.code}
         muted={muted}
-        rulesOpen={rules}
         error={online.error}
         onToggleMute={toggleMute}
+        onRules={() => setRules(true)}
         onDelta={online.move}
         onAbility={online.ability}
         onRematch={online.voteRematch}
         onLeave={online.leave}
-        onRules={() => setRules(true)}
       />
     )
   } else if (panel === 'local' && game && handoff && game.phase !== 'over') {
     const incoming = game.incoming?.target === game.turn ? game.incoming : null
-    const blinded = incoming?.type === 'blind'
-    const locked = incoming?.type === 'lock'
     body = (
       <Handoff
         name={game.names[game.turn]}
-        number={blinded ? null : game.current}
-        locked={locked}
+        number={incoming?.type === 'blind' ? null : game.current}
+        locked={incoming?.type === 'lock'}
         twin={incoming?.type === 'twin' ? incoming.delta : null}
         hushed={incoming?.type === 'hush'}
         masked={incoming?.type === 'mask'}
@@ -163,16 +168,14 @@ export function App() {
         presence={null}
         rematch={null}
         pending={false}
-        roomCode=""
         muted={muted}
-        rulesOpen={rules}
         error={localError}
         onToggleMute={toggleMute}
+        onRules={() => setRules(true)}
         onDelta={commitMove}
         onAbility={commitAbility}
         onRematch={rematchLocal}
         onLeave={leaveLocal}
-        onRules={() => setRules(true)}
       />
     )
   } else {
